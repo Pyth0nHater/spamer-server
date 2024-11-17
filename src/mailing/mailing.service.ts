@@ -63,7 +63,7 @@ export class MailingService {
       for (const username of batch) {
         try {
           const entity = await client.getEntity(username);
-          await sleep(1000); // задержка между отправками
+          await sleep(200); // задержка между отправками
           await client.sendMessage(entity, { message: messageText });
           console.log(`Сообщение отправлено: ${username}`);
         } catch (error) {

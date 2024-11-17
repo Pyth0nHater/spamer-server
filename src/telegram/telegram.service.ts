@@ -8,7 +8,7 @@ export class TelegramService implements OnModuleInit {
 
     // Replace with your actual Telegram bot token
     private readonly botToken = "6807558708:AAEapTJk9thUr6NIIUxn8WRxpx1aoI7pnhs";
-    private readonly webAppUrl = 'https://4t4bt5zb-3000.euw.devtunnels.ms/';
+    private readonly webAppUrl = 'https://poor-breads-fly.loca.lt/sessions';
 
 
     onModuleInit() {
