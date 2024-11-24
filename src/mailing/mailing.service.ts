@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Mailing } from './mailing.entity';
 import { User } from '../users/user.entity';
-import { Sessions } from '../sessions/sessions.entity'; // Импорт сущности Session
+import { Sessions } from '../sessions/sessions.entity';
 import { CreateMailingDto } from '../dto/create-mailing.dto';
 import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions';
