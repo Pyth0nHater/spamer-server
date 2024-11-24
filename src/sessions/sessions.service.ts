@@ -37,4 +37,17 @@ export class SessionsService {
       relations: ['user'],
     });
   }
+
+  async deleteSessionById(id: number): Promise<string> {
+    const session = await this.sessionsRepository.findOne({ where: { id } });
+    if (!session) {
+      throw new Error(`Session with ID ${id} not found`);
+    }
+    await this.sessionsRepository.remove(session);
+    return `Mailing with ID ${id} has been deleted`;
+  }
+
+  findAll(): Promise<Sessions[]> {
+    return this.sessionsRepository.find();
+  }
 }
