@@ -4,9 +4,10 @@ import { Mailing } from './mailing.entity';
 import { MailingService } from './mailing.service';
 import { MailingController } from './mailing.controller';
 import { User } from '../users/user.entity';
+import { Sessions } from 'src/sessions/sessions.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Mailing, User])],
+  imports: [TypeOrmModule.forFeature([Mailing, User, Sessions])],
   providers: [MailingService],
   controllers: [MailingController],
 })

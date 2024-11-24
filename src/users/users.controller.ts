@@ -25,6 +25,14 @@ export class UserController {
     return this.userService.findOne(id);
   }
 
+  @Get('telegram/:id')
+  @ApiOperation({ summary: 'Получить пользователя по Telegram ID' })
+  @ApiParam({ name: 'id', description: 'Telegram ID пользователя' })
+  @ApiResponse({ status: 200, description: 'Информация о пользователе', type: User })
+  findOneTelegram(@Param('id') id: number): Promise<User> {
+    return this.userService.findOneTelegram(id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Создать нового пользователя' })
   @ApiResponse({ status: 201, description: 'Созданный пользователь', type: User })

@@ -20,6 +20,10 @@ export class UserService {
     return this.usersRepository.findOneBy({ id });
   }
 
+  findOneTelegram(telegramId: number): Promise<User> {
+    return this.usersRepository.findOneBy({ telegramId });
+  }
+
   async remove(id: number): Promise<void> {
     await this.usersRepository.delete(id);
   }

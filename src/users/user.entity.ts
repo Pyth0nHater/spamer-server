@@ -18,7 +18,7 @@ export class User {
   Subscribed: boolean;
 
   @OneToMany(() => Sessions, (session) => session.user)
-  session: Sessions[];
+  sessions: Sessions[];
 
   @OneToMany(() => Mailing, (mailing) => mailing.user)
   mailings: Mailing[];

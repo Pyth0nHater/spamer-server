@@ -5,6 +5,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: 'http://localhost:3000', // Укажите разрешенный источник (фронтенд)
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Разрешенные методы
+    credentials: true, // Разрешить передачу cookie/авторизационных данных
+  });
   // Настройка Swagger
   const config = new DocumentBuilder()
     .setTitle('Spamer API')

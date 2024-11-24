@@ -3,10 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Mailing } from './mailing.entity';
 import { User } from '../users/user.entity';
+import { Sessions } from '../sessions/sessions.entity'; // Импорт сущности Session
 import { CreateMailingDto } from '../dto/create-mailing.dto';
-import { TelegramClient } from "telegram";
+import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions';
-import { sleep } from '../utils/sleep'
+import { sleep } from '../utils/sleep';
 
 @Injectable()
 export class MailingService {
@@ -15,69 +16,164 @@ export class MailingService {
     private readonly mailingRepository: Repository<Mailing>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Sessions)
+    private readonly sessionRepository: Repository<Sessions>, // Репозиторий для работы с сессиями
   ) {}
 
   // Метод для сохранения рассылки
   async saveMailing(createMailingDto: CreateMailingDto): Promise<Mailing> {
-    const { session, messageText, usernames, batchSize, waitTime, userId } = createMailingDto;
-
+    const { sessionId, messageText, folderId, batchSize, waitTime, userId } = createMailingDto;
+  
     // Проверяем, существует ли пользователь
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new Error('User not found');
     }
-
+  
+    // Получаем сессию по sessionId
+    const session = await this.sessionRepository.findOne({ where: { id: sessionId } });
+    if (!session) {
+      throw new Error('Session not found');
+    }
+  
+    // Создаем новую рассылку
     const newMailing = this.mailingRepository.create({
-      session,
+      session,  // Сохраняем ссылку на сессию
       messageText,
-      usernames,
+      folderId,
       batchSize,
       waitTime,
       user,
+      started: false, // Изначально рассылка не запущена
     });
-
+  
     return await this.mailingRepository.save(newMailing);
+  }
+  
+  // Метод для запуска рассылки
+  async startMailing(mailingId: number): Promise<void> {
+    const mailing = await this.mailingRepository.findOne({ where: { id: mailingId }, relations: ['session'] });
+    if (!mailing) {
+      throw new Error('Mailing not found');
+    }
+  
+    if (mailing.started) {
+      throw new Error('Mailing is already running');
+    }
+  
+    mailing.started = true;
+    await this.mailingRepository.save(mailing);
+  
+    try {
+      await this.sendMessages(mailingId);
+    } catch (error) {
+      console.error('Error during mailing:', error);
+    } finally {
+      mailing.started = false;
+      await this.mailingRepository.save(mailing);
+    }
+  }
+  
+
+  // Метод для остановки рассылки
+  async stopMailing(mailingId: number): Promise<void> {
+    const mailing = await this.mailingRepository.findOne({ where: { id: mailingId } });
+    if (!mailing) {
+      throw new Error('Mailing not found');
+    }
+
+    if (!mailing.started) {
+      throw new Error('Mailing is not running');
+    }
+
+    mailing.started = false;
+    await this.mailingRepository.save(mailing);
+
+    console.log('Mailing stopped successfully');
+  }
+
+  // Метод для получения информации о рассылке
+  async getMailingById(mailingId: number): Promise<Mailing> {
+    const mailing = await this.mailingRepository.findOne({ where: { id: mailingId }, relations: ['user'] });
+    if (!mailing) {
+      throw new Error(`Mailing with ID ${mailingId} not found`);
+    }
+    return mailing;
+  }
+
+  // Метод для получения всех рассылок
+  async getAllMailings(): Promise<Mailing[]> {
+    return this.mailingRepository.find({ relations: ['user'] });
   }
 
   // Метод для отправки сообщений
-  async sendMessages(mailingId: number): Promise<void> {
-    const mailing = await this.mailingRepository.findOne({ where: { id: mailingId} });
+  private async sendMessages(mailingId: number): Promise<void> {
+    const mailing = await this.mailingRepository.findOne({ where: { id: mailingId }, relations: ['session'] });
     if (!mailing) {
-      throw new Error('Mailing not found or you do not have access to it');
+      throw new Error('Mailing not found');
     }
-
-    const {session, messageText, usernames, batchSize, waitTime } = mailing;
-
-    // Ваши API_ID и API_HASH из .env
-    const API_ID = parseInt(process.env.API_ID);
+  
+    const { session, messageText, folderId, batchSize, waitTime } = mailing;
+  
+    // Проверяем наличие API_ID и API_HASH
+    const API_ID = parseInt(process.env.API_ID, 10);
     const API_HASH = process.env.API_HASH;
-    const ownerSession = new StringSession(session); // Добавьте актуальную строку сессии владельца
-
+  
+    if (!API_ID || !API_HASH) {
+      throw new Error('API_ID and API_HASH must be set in the environment variables');
+    }
+  
+    // Используем sessionString из session
+    const ownerSession = new StringSession(session.session); // Где session.session — это строка сессии
     const client = new TelegramClient(ownerSession, API_ID, API_HASH, {});
-
+  
     await client.connect();
-
-    // Отправляем сообщение
-    for (let i = 0; i < usernames.length; i += batchSize) {
-      const batch = usernames.slice(i, i + batchSize);
-      for (const username of batch) {
-        try {
-          const entity = await client.getEntity(username);
-          await sleep(200); // задержка между отправками
-          await client.sendMessage(entity, { message: messageText });
-          console.log(`Сообщение отправлено: ${username}`);
-        } catch (error) {
-          console.error(`Ошибка при отправке сообщения ${username}:`, error);
+  
+    try {
+      const result: Api.messages.DialogFilters = await client.invoke(
+        new Api.messages.GetDialogFilters(),
+      );
+  
+      const filters = result.filters || [];
+      const targetFilter: any = filters[folderId];
+  
+      if (!targetFilter?.includePeers) {
+        console.error('No valid peers found in the specified filter');
+        return;
+      }
+  
+      const usernames = targetFilter.includePeers;
+  
+      for (let i = 0; i < usernames.length; i += batchSize) {
+        const batch = usernames.slice(i, i + batchSize);
+  
+        for (const username of batch) {
+          if (!mailing.started) {
+            console.log('Mailing stopped manually');
+            return;
+          }
+  
+          try {
+            const entity = await client.getEntity(username);
+            await client.sendMessage(entity, { message: messageText });
+            console.log(`Message sent to ${entity}`);
+          } catch (error) {
+            console.error(`Error sending message to ${username}:`, error);
+          }
+        }
+  
+        if (i + batchSize < usernames.length) {
+          console.log(`Waiting ${waitTime} seconds before the next batch...`);
+          await sleep(waitTime * 1000);
         }
       }
-
-      // Задержка между партиями
-      if (i + batchSize < usernames.length) {
-        console.log(`Ожидание ${waitTime / 1000} секунд перед следующей партией...`);
-        await sleep(waitTime);
-      }
+  
+      console.log('All messages have been sent successfully');
+    } catch (error) {
+      console.error('An error occurred while working with Telegram API:', error);
+    } finally {
+      await client.disconnect();
     }
-
-    console.log('Все сообщения отправлены');
   }
+  
 }

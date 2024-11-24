@@ -1,5 +1,7 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
+// session.entity.ts
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Mailing } from '../mailing/mailing.entity';
 
 @Entity()
 export class Sessions {
@@ -7,11 +9,14 @@ export class Sessions {
   id: number;
 
   @Column()
-  session: string;
-
-  @Column()
   name: string;
 
-  @ManyToOne(() => User, (user) => user.session, { onDelete: 'CASCADE' })
+  @Column()
+  session: string;
+
+  @ManyToOne(() => User, (user) => user.sessions, { onDelete: 'CASCADE' })
   user: User;
+
+  @OneToMany(() => Mailing, (mailing) => mailing.session) // Обратная связь
+  mailings: Mailing[];
 }
