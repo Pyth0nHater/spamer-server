@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import { CreateUserDto } from '../dto/create-user.dto';
 
-
 @Injectable()
 export class UserService {
   constructor(
@@ -20,8 +19,9 @@ export class UserService {
     return this.usersRepository.findOneBy({ id });
   }
 
-  findOneTelegram(telegramId: number): Promise<User> {
-    return this.usersRepository.findOneBy({ telegramId });
+  async findOneTelegram(telegramId: number): Promise<User | 0> {
+    const user = await this.usersRepository.findOneBy({ telegramId });
+    return user || 0;
   }
 
   async remove(id: number): Promise<void> {
@@ -31,5 +31,5 @@ export class UserService {
   create(user: CreateUserDto): Promise<User> {
     const newUser = this.usersRepository.create(user);
     return this.usersRepository.save(newUser);
-  }  
+  }
 }
